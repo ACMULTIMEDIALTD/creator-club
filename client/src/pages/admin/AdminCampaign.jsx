@@ -99,7 +99,7 @@ export default function AdminCampaign() {
         {c.status !== 'draft' && <button className="btn whatsapp sm" onClick={copyWhatsapp}>העתקת הודעת ווטסאפ</button>}
         <DownloadLink className="btn ghost sm" href={`/api/v1/admin/campaigns/${id}/export.csv`}>ייצוא נבחרות (CSV)</DownloadLink>
         <Link className="btn ghost sm" to={`/admin/campaigns/${id}/edit`}>עריכה</Link>
-        <Link className="btn ghost sm" to={`/c/${c.slug}`}>תצוגה כמו יוצרת</Link>
+        <Link className="btn ghost sm" to={`/admin/preview/${c.slug}`}>👁 תצוגה מקדימה</Link>
         {NEXT_STATUS[c.status].map(([s, label]) => (
           <ConfirmButton key={s} className={`btn sm ${s === 'cancelled' ? 'danger' : s === 'open' ? 'primary' : 'outline'}`} disabled={busy}
             ask={CLOSING.includes(s) && counts.applied ? `${counts.applied} מועמדויות ממתינות יסומנו כ״לא הפעם״. להמשיך?` : null}

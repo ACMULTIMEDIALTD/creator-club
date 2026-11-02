@@ -68,12 +68,19 @@ export default function Campaign() {
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Spinner />;
 
+  return <CampaignView data={data} slug={slug} isAdmin={me.user.role === 'admin'} busy={busy} withdraw={withdraw} load={load} />;
+}
+
+/**
+ * The campaign page itself. Also used by Noa's preview (preview: true) with made-up states,
+ * where it renders exactly what a creator sees and nothing in it is sent anywhere.
+ */
+export function CampaignView({ data, slug, isAdmin, busy, withdraw, load, preview }) {
   const { campaign: c, my_application: app, eligibility: elig, selected, payment, shipping } = data;
-  const isAdmin = me.user.role === 'admin';
 
   return (
     <div className="narrow campaign-page">
-      <Link to={isAdmin ? '/admin/campaigns' : '/dashboard'} className="back">→ חזרה</Link>
+      {!preview && <Link to={isAdmin ? '/admin/campaigns' : '/dashboard'} className="back">→ חזרה</Link>}
       <div className={`card${c.image_url ? ' has-img' : ''}`}>
         {c.image_url && <img className="campaign-hero" src={assetUrl(c.image_url)} alt="" />}
         <div className="cc-top">

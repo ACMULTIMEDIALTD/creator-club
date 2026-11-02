@@ -29,7 +29,7 @@ export default function AdminCampaigns() {
       {!rows ? <Spinner /> : !rows.length ? <Empty>אין קמפיינים.</Empty> : (
         <ul className="list">
           {rows.map((c) => (
-            <li key={c.id}>
+            <li key={c.id} className="with-action">
               <Link to={`/admin/campaigns/${c.id}`} className="list-row">
                 <span className="grow">
                   <b>{c.title}</b> <span className="muted">· {c.brand_name || c.brand_display_name}</span>
@@ -39,6 +39,7 @@ export default function AdminCampaigns() {
                 <CampaignStatusChip status={c.status} />
                 <span className="counts">{c.applied_count} ממתינות · <b>{c.selected_count}/{c.slots}</b></span>
               </Link>
+              <Link to={`/admin/preview/${c.slug}`} className="btn ghost sm preview-btn" title="כך יוצרת רואה את הקמפיין">👁 תצוגה מקדימה</Link>
             </li>
           ))}
         </ul>
