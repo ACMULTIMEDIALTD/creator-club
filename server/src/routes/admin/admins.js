@@ -7,9 +7,13 @@ import { HttpError, notFound, parse } from '../../lib/http.js';
 import { logEvent } from '../../lib/events.js';
 import { mails } from '../../lib/mailer.js';
 import { suggestEmail } from '../../lib/emailTypos.js';
+import { config } from '../../config.js';
 
 const router = Router();
 const uuid = z.string().uuid();
+
+// The community owner (ADMIN_EMAIL: Noa) can never be removed, by anyone
+const isOwner = (email) => !!config.adminEmail && String(email).toLowerCase() === config.adminEmail.toLowerCase();
 
 // No look-alike characters (0/O, 1/l/I) so it can be typed from a WhatsApp message
 const tempPassword = () => {
@@ -23,7 +27,7 @@ router.get('/', async (req, res) => {
     `SELECT id, email, created_at, last_login_at FROM users
      WHERE role = 'admin' AND status = 'active' ORDER BY created_at`,
   );
-  res.json({ admins: rows.map((a) => ({ ...a, me: a.id === req.user.id })) });
+  res.json({ admins: rows.map((a) => ({ ...a, me: a.id === req.user.id, owner: isOwner(a.email) })) });
 });
 
 /**
@@ -69,6 +73,8 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   if (!uuid.safeParse(req.params.id).success) throw notFound('admin_not_found');
   if (req.params.id === req.user.id) throw new HttpError(400, 'self', 'אי אפשר להסיר את עצמך');
+  const target = await one(`SELECT email FROM users WHERE id = $1 AND role = 'admin'`, [req.params.id]);
+  if (target && isOwner(target.email)) throw new HttpError(403, 'owner', 'אי אפשר להסיר את נועה, בעלת הקהילה');
   const removed = await one(
     `UPDATE users SET status = 'suspended', session_version = session_version + 1
      WHERE id = $1 AND role = 'admin' AND status = 'active' RETURNING id, email`,

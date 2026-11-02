@@ -832,6 +832,68 @@ test('admin team: add (temp password + email), promote a creator on purpose, rem
   const me = list.find((a) => a.me);
   await second.delete(`/api/v1/admin/admins/${me.id}`).expect(400);
   await noa.delete(`/api/v1/admin/admins/${me.id}`).expect(200);
+  // Noa (the owner, ADMIN_EMAIL) can't be removed by anyone
+  const all = (await noa.get('/api/v1/admin/admins').expect(200)).body.admins;
+  const owner = all.find((x) => x.email === 'admin@test.local');
+  assert.equal(owner.owner, true);
+  const helper = await noa.post('/api/v1/admin/admins').send({ email: 'third.admin@test.local' }).expect(201);
+  const third = agent();
+  await third.post('/api/v1/auth/login').send({ email: 'third.admin@test.local', password: helper.body.password }).expect(200);
+  const denied = await third.delete(`/api/v1/admin/admins/${owner.id}`).expect(403);
+  assert.equal(denied.body.error, 'owner');
+  await noa.get('/api/v1/admin/overview').expect(200);
   await second.get('/api/v1/admin/overview').expect(401);
   await agent().post('/api/v1/auth/login').send({ email: 'second.admin@test.local', password: r.body.password }).expect(403);
+});
+
+test('unfinished signups: reminder after 24h, deleted 48h after the reminder, can sign up again', async () => {
+  const { runSignupCleanup } = await import('../src/lib/signupCleanup.js');
+  const quiet = { log: () => {} };
+  const signup = async (email, phone) => (await agent().post('/api/v1/auth/signup').send({ email, phone, password: 'password123' }).expect(201)).body.user.id;
+  const fresh = await signup('fresh@test.local', '0531110001');
+  const day = await signup('day@test.local', '0531110002');
+  const old = await signup('old@test.local', '0531110003'); // signed up long before the cleanup existed
+  const done = await makeCreator({ activate: false }); // has a profile: never touched
+  await pool.query("UPDATE users SET created_at = now() - interval '25 hours' WHERE id = ANY($1::uuid[])", [[day, done.id]]);
+  await pool.query("UPDATE users SET created_at = now() - interval '10 days' WHERE id = $1", [old]);
+
+  outbox.length = 0;
+  let r = await runSignupCleanup(quiet);
+  assert.deepEqual(r, { reminded: 2, expired: 0 }); // day + old get warned first; nobody deleted yet
+  assert.deepEqual(outbox.map((m) => m.to).sort(), ['day@test.local', 'old@test.local']);
+  assert.match(outbox[0].subject, /צעד קטן/);
+  assert.match(outbox[0].text, /עד \d/);
+
+  // Running again doesn't remind twice
+  outbox.length = 0;
+  assert.deepEqual(await runSignupCleanup(quiet), { reminded: 0, expired: 0 });
+  assert.equal(outbox.length, 0);
+
+  // 48h after the reminder (72h after signing up): deleted, with an email inviting her back
+  await pool.query("UPDATE users SET signup_reminded_at = now() - interval '49 hours' WHERE id = $1", [day]);
+  r = await runSignupCleanup(quiet);
+  assert.deepEqual(r, { reminded: 0, expired: 1 });
+  assert.equal(outbox[0].to, 'day@test.local');
+  assert.match(outbox[0].subject, /פגה/);
+  const left = (await pool.query('SELECT id FROM users WHERE id = ANY($1::uuid[])', [[fresh, day, old, done.id]])).rows.map((x) => x.id);
+  assert.ok(!left.includes(day));
+  assert.ok(left.includes(fresh) && left.includes(old) && left.includes(done.id));
+  // Email and phone are free again
+  await signup('day@test.local', '0531110002');
+
+  // The one-time step when this shipped: unfinished signups older than 48h expire right away
+  const legacy = await signup('legacy@test.local', '0531110004');
+  const recent = await signup('recent@test.local', '0531110005');
+  await pool.query("UPDATE users SET created_at = now() - interval '3 days' WHERE id = $1", [legacy]);
+  await pool.query("UPDATE users SET created_at = now() - interval '30 hours' WHERE id = $1", [recent]);
+  const fs = await import('node:fs');
+  const sql = fs.readFileSync(new URL('../migrations/010_signup_reminders.sql', import.meta.url), 'utf8');
+  await pool.query(sql.slice(sql.indexOf('UPDATE users')));
+  outbox.length = 0;
+  r = await runSignupCleanup(quiet);
+  const expiredTo = outbox.filter((m) => /פגה/.test(m.subject)).map((m) => m.to);
+  assert.ok(expiredTo.includes('legacy@test.local'));
+  assert.ok(!expiredTo.includes('recent@test.local')); // under 48h: reminded, not deleted
+  assert.ok(outbox.some((m) => m.to === 'recent@test.local' && /צעד קטן/.test(m.subject)));
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM users WHERE id = $1', [legacy])).rows[0].n, 0);
 });

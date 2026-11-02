@@ -50,10 +50,10 @@ export default function AdminTeam() {
         {admins.map((a) => (
           <li key={a.id} className="list-row">
             <span className="grow">
-              <b dir="ltr">{a.email}</b>{a.me && <span className="muted"> (את/ה)</span>}
+              <b dir="ltr">{a.email}</b>{a.owner && <span className="chip">בעלת הקהילה</span>}{a.me && <span className="muted"> (את/ה)</span>}
               <span className="muted small block">נוסף/ה {fmtDate(a.created_at)} · כניסה אחרונה {a.last_login_at ? fmtDateTime(a.last_login_at) : 'עוד לא נכנס/ה'}</span>
             </span>
-            {!a.me && <ConfirmButton ask="להסיר את ההרשאה?" onConfirm={() => remove(a.id)}>הסרה</ConfirmButton>}
+            {!a.me && !a.owner && <ConfirmButton ask="להסיר את ההרשאה?" onConfirm={() => remove(a.id)}>הסרה</ConfirmButton>}
           </li>
         ))}
       </ul>
