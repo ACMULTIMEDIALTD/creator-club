@@ -234,6 +234,23 @@ export const mails = {
     }),
   }),
 
+  adminAdded: (to, by) => {
+    const url = `${config.appUrl}/login?next=%2Fadmin`;
+    return sendMail({
+      to,
+      subject: 'הוספת לצוות הניהול של The Creator Club',
+      text: `${by} הוסיפה אותך כמנהל/ת ב-The Creator Club.\nהסיסמה הזמנית נשלחת אלייך בנפרד, ואפשר גם להיכנס עם קוד למייל:\n${url}`,
+      html: layout({
+        preheader: 'נוספת כמנהל/ת במערכת הקהילה.',
+        title: 'ברוכים הבאים לצוות הניהול',
+        body: `<p>הוספת כמנהל/ת במערכת של The Creator Club, על ידי <span dir="ltr">${esc(by)}</span>.</p>
+          <p>הסיסמה הזמנית נשלחת אלייך בנפרד. אפשר גם להיכנס בלי סיסמה, עם קוד שנשלח למייל הזה.</p>`,
+        cta: { label: 'כניסה למערכת', url },
+        note: 'לא ציפית למייל הזה? פני לנועה.',
+      }),
+    });
+  },
+
   newSignup: (name, email) => {
     const url = `${config.appUrl}/admin/creators?status=pending`;
     return sendMail({
