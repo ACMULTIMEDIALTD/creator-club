@@ -798,3 +798,40 @@ async function loginAdmin2() {
   }
   throw new Error('admin login failed');
 }
+
+test('admin team: add (temp password + email), promote a creator on purpose, remove', async () => {
+  const noa = await loginAdmin2();
+  outbox.length = 0;
+  const r = await noa.post('/api/v1/admin/admins').send({ email: 'Second.Admin@Test.local' }).expect(201);
+  assert.equal(r.body.admin.email, 'second.admin@test.local');
+  assert.match(r.body.password, /^[a-z2-9]{12}$/);
+  assert.match(outbox[0].subject, /צוות הניהול/);
+  assert.ok(!outbox[0].text.includes(r.body.password)); // the password never goes by email
+
+  // The new admin signs in and sees the admin area
+  const second = agent();
+  const login = await second.post('/api/v1/auth/login').send({ email: 'second.admin@test.local', password: r.body.password }).expect(200);
+  assert.equal(login.body.user.role, 'admin');
+  await second.get('/api/v1/admin/overview').expect(200);
+  const list = (await second.get('/api/v1/admin/admins').expect(200)).body.admins;
+  assert.ok(list.find((a) => a.email === 'second.admin@test.local').me);
+
+  await noa.post('/api/v1/admin/admins').send({ email: 'second.admin@test.local' }).expect(409);
+  await noa.post('/api/v1/admin/admins').send({ email: 'x@gnail.com' }).expect(400);
+
+  // A creator's address needs an explicit promote
+  const c = await makeCreator({ admin: noa });
+  const asCreator = await noa.post('/api/v1/admin/admins').send({ email: c.email }).expect(409);
+  assert.equal(asCreator.body.error, 'is_creator');
+  await noa.post('/api/v1/admin/admins').send({ email: c.email, promote: true }).expect(201);
+  await c.agent.get('/api/v1/auth/me').expect(401); // her old creator session ended
+
+  // Creators can't touch this; you can't remove yourself; removing ends their access
+  const creator = await makeCreator({ admin: noa });
+  await creator.agent.get('/api/v1/admin/admins').expect(403);
+  const me = list.find((a) => a.me);
+  await second.delete(`/api/v1/admin/admins/${me.id}`).expect(400);
+  await noa.delete(`/api/v1/admin/admins/${me.id}`).expect(200);
+  await second.get('/api/v1/admin/overview').expect(401);
+  await agent().post('/api/v1/auth/login').send({ email: 'second.admin@test.local', password: r.body.password }).expect(403);
+});

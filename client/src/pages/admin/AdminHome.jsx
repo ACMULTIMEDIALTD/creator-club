@@ -45,6 +45,7 @@ export default function AdminHome() {
       <div className="page-head">
         <h1 className="page-title">היום</h1>
         <div className="head-actions">
+          <Link to="/admin/team" className="btn ghost sm">צוות ניהול</Link>
           <Link to="/password" className="btn ghost sm">החלפת סיסמה</Link>
           <Link to="/admin/campaigns/new" className="btn primary">+ קמפיין חדש</Link>
         </div>
