@@ -432,3 +432,14 @@ a.list-row:hover { border-color: var(--wine); }
 .email-edit { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .email-edit input { min-width: 220px; }
 .temp-pass { font-size: 1.6rem; letter-spacing: 2px; background: var(--cream-2); padding: 8px 16px; border-radius: 10px; }
+
+/* ---------- campaign preview (admin) ---------- */
+.with-action { display: flex; gap: 8px; align-items: stretch; }
+.with-action > .list-row { flex: 1; min-width: 0; }
+.preview-btn { align-self: center; white-space: nowrap; }
+@media (max-width: 640px) { .with-action { flex-direction: column; } .preview-btn { align-self: flex-start; } }
+.preview-phone { position: relative; width: 410px; max-width: 100%; margin: 16px auto 32px; border: 12px solid #1d1012; border-radius: 48px; background: var(--cream); box-shadow: 0 30px 60px rgba(60, 10, 15, .2); overflow: hidden; }
+.preview-screen { height: 760px; overflow-y: auto; padding-top: 12px; }
+.preview-screen .narrow { max-width: none; padding: 0 12px; }
+.preview-pad { padding: 12px; }
+.preview-note { position: absolute; left: 12px; right: 12px; bottom: 14px; background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 14px; text-align: center; font-size: .9rem; }
