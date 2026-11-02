@@ -832,6 +832,16 @@ test('admin team: add (temp password + email), promote a creator on purpose, rem
   const me = list.find((a) => a.me);
   await second.delete(`/api/v1/admin/admins/${me.id}`).expect(400);
   await noa.delete(`/api/v1/admin/admins/${me.id}`).expect(200);
+  // Noa (the owner, ADMIN_EMAIL) can't be removed by anyone
+  const all = (await noa.get('/api/v1/admin/admins').expect(200)).body.admins;
+  const owner = all.find((x) => x.email === 'admin@test.local');
+  assert.equal(owner.owner, true);
+  const helper = await noa.post('/api/v1/admin/admins').send({ email: 'third.admin@test.local' }).expect(201);
+  const third = agent();
+  await third.post('/api/v1/auth/login').send({ email: 'third.admin@test.local', password: helper.body.password }).expect(200);
+  const denied = await third.delete(`/api/v1/admin/admins/${owner.id}`).expect(403);
+  assert.equal(denied.body.error, 'owner');
+  await noa.get('/api/v1/admin/overview').expect(200);
   await second.get('/api/v1/admin/overview').expect(401);
   await agent().post('/api/v1/auth/login').send({ email: 'second.admin@test.local', password: r.body.password }).expect(403);
 });
