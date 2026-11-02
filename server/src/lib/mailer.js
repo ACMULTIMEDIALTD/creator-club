@@ -234,6 +234,41 @@ export const mails = {
     }),
   }),
 
+  signupReminder: (to, deadline) => {
+    const url = `${config.appUrl}/login?next=%2Fjoin`;
+    const until = new Date(deadline).toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return sendMail({
+      to,
+      subject: 'נשאר רק עוד צעד קטן להצטרפות לקהילה 💛',
+      text: `התחלת להירשם ל-The Creator Club ועוד לא השלמת את הפרופיל.\nבלי פרופיל אי אפשר להיכנס לקהילה. אפשר להשלים עד ${until}, ואחרי זה ההרשמה תפוג.\nממשיכים מאותו מקום: ${url}`,
+      html: layout({
+        preheader: `אפשר להשלים את ההרשמה עד ${until}.`,
+        title: 'נשאר רק עוד צעד קטן',
+        body: `<p>התחלת להירשם ל-The Creator Club, אבל עוד לא השלמת את הפרופיל: הפרטים, הרשתות ואישור התנאים.</p>
+          <p>בלי פרופיל אי אפשר להיכנס לקהילה, ונועה לא יכולה לאשר אותך. זה לוקח כמה דקות, וממשיכים בדיוק מאיפה שעצרת.</p>
+          ${details([row('אפשר להשלים עד', `<b>${esc(until)}</b>`)])}
+          <p style="margin-top:14px">אחרי המועד הזה ההרשמה תפוג והפרטים יימחקו.</p>`,
+        cta: { label: 'להשלמת ההרשמה', url },
+      }),
+    });
+  },
+
+  signupExpired: (to) => {
+    const url = `${config.appUrl}/join`;
+    return sendMail({
+      to,
+      subject: 'ההרשמה שלך ל-The Creator Club פגה',
+      text: `ההרשמה שלך ל-The Creator Club לא הושלמה בזמן, ולכן פגה והפרטים נמחקו.\nאם תבחרי בנו שוב, נשמח לראות אותך! אפשר להירשם מחדש כאן: ${url}`,
+      html: layout({
+        preheader: 'אם תבחרי בנו שוב, אפשר להירשם מחדש.',
+        title: 'ההרשמה שלך פגה',
+        body: `<p>ההרשמה שלך ל-The Creator Club לא הושלמה בזמן, ולכן היא פגה והפרטים שמסרת נמחקו.</p>
+          <p>אם תבחרי בנו שוב, נשמח מאוד לראות אותך בקהילה 💛 ההרשמה מחדש לוקחת כמה דקות.</p>`,
+        cta: { label: 'להרשמה מחדש', url },
+      }),
+    });
+  },
+
   adminAdded: (to, by) => {
     const url = `${config.appUrl}/login?next=%2Fadmin`;
     return sendMail({
