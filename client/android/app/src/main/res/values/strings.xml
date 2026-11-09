@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Creator Club</string>
+    <string name="title_activity_main">Creator Club</string>
+    <string name="package_name">il.co.noaavital.creatorclub</string>
+    <string name="custom_url_scheme">il.co.noaavital.creatorclub</string>
+</resources>

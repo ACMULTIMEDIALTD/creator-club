@@ -1,0 +1,45 @@
+# Render Blueprint — API + Postgres. The React client deploys to Vercel (see client/vercel.json).
+services:
+  - type: web
+    name: creator-club-api
+    runtime: node
+    region: frankfurt      # closest Render region to Israel
+    plan: starter          # always on; the free plan sleeps and takes ~1 min to wake
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm run setup && npm start   # migrate + idempotent seed
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        fromDatabase: { name: creator-club-db, property: connectionString }
+      - key: JWT_SECRET
+        generateValue: true
+      - key: APP_URL
+        value: https://club.noaavital.co.il
+      - key: CORS_ORIGIN
+        value: https://club.noaavital.co.il
+      - key: CURRENT_TERMS_VERSION
+        value: 2026-10-v2
+      - key: TERMS_PDF_URL
+        sync: false
+      - key: WHATSAPP_GROUP_URL
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SMTP_URL
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: NOTIFY_EMAIL
+        sync: false
+databases:
+  - name: creator-club-db
+    region: frankfurt      # must match the web service so it can use the private connection
+    plan: basic-256mb
+    ipAllowList: []        # no connections from the internet; the API uses Render's private network

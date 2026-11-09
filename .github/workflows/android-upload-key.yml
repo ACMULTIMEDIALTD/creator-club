@@ -1,0 +1,45 @@
+# One time: creates the Google Play upload key and stores it ENCRYPTED in the repo
+# (client/android/upload-key.p12.enc). The repo is public, so the key itself never leaves the
+# runner unencrypted: it's AES-256 encrypted with the ANDROID_KEYSTORE_PASSWORD secret.
+# Run it by hand: GitHub → Actions → "Android: create upload key" → Run workflow (on main).
+name: 'Android: create upload key'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create-key:
+    runs-on: ubuntu-latest
+    env:
+      PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ENC: client/android/upload-key.p12.enc
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check
+        run: |
+          [ ${#PW} -ge 16 ] || { echo "::error::Add the repository secret ANDROID_KEYSTORE_PASSWORD (at least 16 characters) first. See MOBILE.md"; exit 1; }
+          [ ! -f "$ENC" ] || { echo "::error::$ENC already exists. A new key would not match the one Google Play knows; delete the file on purpose only if you really mean to replace it."; exit 1; }
+      - name: Create and encrypt the key
+        run: |
+          keytool -genkeypair -storetype PKCS12 -keystore "$RUNNER_TEMP/upload.p12" -alias upload \
+            -keyalg RSA -keysize 2048 -validity 10000 -storepass:env PW -keypass:env PW \
+            -dname "CN=Creator Club, O=AC Multimedia Ltd, C=IL"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$RUNNER_TEMP/upload.p12" -out "$ENC" -pass env:PW
+          {
+            echo "### Upload key created ✓"
+            echo "Certificate fingerprints (public, for reference):"
+            echo '```'
+            keytool -list -v -keystore "$RUNNER_TEMP/upload.p12" -storepass:env PW -alias upload | grep -E 'SHA1|SHA256'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$RUNNER_TEMP/upload.p12"
+      - name: Save the encrypted key in the repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$ENC"
+          git commit -m "Add encrypted Google Play upload key"
+          git push

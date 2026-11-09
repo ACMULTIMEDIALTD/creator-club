@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["APPLE_TEAM_ID.il.co.noaavital.creatorclub"],
+        "components": [
+          { "/": "/c/*", "comment": "campaign links from WhatsApp" },
+          { "/": "/m/*", "comment": "sign-in links from email" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,111 @@
+# Builds the Android app for Google Play (signed .aab) in the cloud.
+# Run it by hand: GitHub → Actions → "Android → Google Play" → Run workflow.
+# Needs: the encrypted upload key (run "Android: create upload key" once) and the
+# ANDROID_KEYSTORE_PASSWORD secret. Optional secrets (see MOBILE.md):
+#   GOOGLE_SERVICES_JSON          Firebase config → push notifications on Android
+#   PLAY_SERVICE_ACCOUNT_JSON     uploads straight to Play Console (after the first manual upload)
+name: Android → Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version shown in Google Play (e.g. 1.0, 1.1)'
+        required: true
+        default: '1.0'
+      track:
+        description: 'Play track (when automatic upload is set up)'
+        type: choice
+        options: [internal, alpha, beta, production]
+        default: internal
+      status:
+        description: 'draft = you press "Roll out" in Play Console; completed = goes out right away'
+        type: choice
+        options: [draft, completed]
+        default: draft
+
+concurrency: android-play
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      VERSION: ${{ inputs.version }}
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+      HAS_PLAY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check settings
+        run: |
+          [ -n "$PW" ] || { echo "::error::Missing repository secret ANDROID_KEYSTORE_PASSWORD (see MOBILE.md)"; exit 1; }
+          [ -f android/upload-key.p12.enc ] || { echo "::error::No upload key yet: run 'Android: create upload key' once (see MOBILE.md)"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}$ ]] || { echo "::error::Version must look like 1.0 or 1.0.1"; exit 1; }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Firebase config (push notifications)
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          echo "VITE_ANDROID_PUSH=1" >> "$GITHUB_ENV"
+
+      - run: npm ci
+      - run: npm run build:app
+      - run: npx cap sync android
+
+      - name: Unlock the upload key
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in android/upload-key.p12.enc -out "$RUNNER_TEMP/upload.p12" -pass env:PW
+
+      - name: Build the signed bundle (.aab)
+        working-directory: client/android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/upload.p12
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: ${{ inputs.version }}
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Remove the unlocked key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload.p12"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: creator-club-${{ inputs.version }}-${{ github.run_number }}-aab
+          path: client/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload to Google Play
+        if: env.HAS_PLAY == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: il.co.noaavital.creatorclub
+          releaseFiles: client/android/app/build/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: ${{ inputs.status }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### Android $VERSION (version code ${{ github.run_number }}) built ✓"
+            if [ "$HAS_PLAY" = "true" ]; then echo "Uploaded to Play Console → ${{ inputs.track }} (${{ inputs.status }})."
+            else echo "Download the .aab from **Artifacts** below and upload it in Play Console."; fi
+            [ "$HAS_FIREBASE" = "true" ] || echo "Push notifications are off on Android (no GOOGLE_SERVICES_JSON secret)."
+          } >> "$GITHUB_STEP_SUMMARY"

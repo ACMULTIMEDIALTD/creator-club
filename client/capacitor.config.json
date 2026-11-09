@@ -1,0 +1,27 @@
+{
+  "appId": "il.co.noaavital.creatorclub",
+  "appName": "Creator Club",
+  "webDir": "dist",
+  "backgroundColor": "#FFFBED",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#FFFBED"
+  },
+  "android": {
+    "backgroundColor": "#FFFBED"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#FFFBED",
+      "showSpinner": false
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
