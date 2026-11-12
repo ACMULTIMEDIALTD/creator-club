@@ -1,0 +1,4 @@
+# Creator data and reports stay out of git
+*.csv
+!creators.example.csv
+__pycache__/

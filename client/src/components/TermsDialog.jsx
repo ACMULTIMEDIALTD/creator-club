@@ -22,6 +22,18 @@ export default function TermsDialog({ onClose, onReadToEnd }) {
   // A tall screen may show everything without scrolling
   useEffect(() => { check(); }, []);
 
+  // The end of the text came into view, whichever element scrolled it there. Some phone browsers
+  // scroll the whole sheet instead of its body, and then the body's own scroll check never fires.
+  const endRef = useRef(null);
+  useEffect(() => {
+    if (!onReadToEnd || !endRef.current || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setAtEnd(true);
+    });
+    io.observe(endRef.current);
+    return () => io.disconnect();
+  }, [onReadToEnd]);
+
   const confirm = () => { onReadToEnd(); onClose(); };
 
   return (
@@ -31,7 +43,7 @@ export default function TermsDialog({ onClose, onReadToEnd }) {
           <h2>תנאי הצטרפות לקהילה</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="סגירה">×</button>
         </div>
-        <div className="sheet-body" ref={bodyRef} onScroll={check}><TermsContent /></div>
+        <div className="sheet-body" ref={bodyRef} onScroll={check}><TermsContent /><div className="sheet-end" ref={endRef} /></div>
         {onReadToEnd ? (
           <button type="button" className="btn primary block" disabled={!atEnd} onClick={confirm}>
             {atEnd ? 'קראתי את התנאים' : 'יש לגלול עד סוף התנאים ↓'}

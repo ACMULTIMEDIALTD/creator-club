@@ -71,3 +71,8 @@ The integration suite drops and recreates the `public` schema of that database. 
 - `POST /me/terms` is the endpoint behind the re-accept modal. `GET /public/meta` serves the niches and regions lists. `POST /public/brand-inquiry` emails Noa from `/brands` and has a honeypot field against spam.
 - `GET /admin/overview` powers the admin "today" screen.
 - CSV exports include a UTF-8 BOM so Excel shows Hebrew correctly, and they guard against formula injection.
+
+## Planning docs and tools (Hebrew)
+
+- [Feasibility study](docs/01-feasibility.md), [lean launch plan](docs/02-lean-plan.md), [improvement research](docs/03-improvements.md)
+- [Creator follower sync](tools/creator_sync/README.md): checks the follower counts creators declare against Instagram
