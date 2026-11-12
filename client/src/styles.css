@@ -314,8 +314,10 @@ a.list-row:hover { border-color: var(--wine); }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 999px; z-index: 60; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 
 /* ---------- modal / spinner ---------- */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(43, 19, 22, .5); display: grid; place-items: center; padding: 16px; z-index: 100; }
-.modal { background: var(--paper); border-radius: var(--radius); padding: 24px; width: min(460px, 100%); display: flex; flex-direction: column; gap: 14px; }
+/* The backdrop scrolls when a modal is taller than the screen (small phones, enlarged text), and the
+   modal's auto margins center it only while it fits, so its top and buttons are never cut off. */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(43, 19, 22, .5); display: grid; padding: 16px; z-index: 100; overflow-y: auto; overscroll-behavior: contain; }
+.modal { background: var(--paper); border-radius: var(--radius); padding: 24px; width: min(460px, 100%); display: flex; flex-direction: column; gap: 14px; margin: auto; }
 .modal p { margin: 0; }
 .spinner-wrap { display: grid; place-items: center; padding: 40px; }
 .spinner-wrap.full { min-height: 60vh; }
@@ -349,7 +351,8 @@ a.list-row:hover { border-color: var(--wine); }
 .terms ol { list-style: none; padding: 0; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
 .terms-page .card { margin-top: 8px; }
 .modal-backdrop.top { z-index: 110; }
-.modal.sheet { width: min(640px, 100%); max-height: min(86vh, 900px); padding: 18px; gap: 10px; }
+.modal.sheet { width: min(640px, 100%); max-height: min(86vh, 900px); max-height: min(86dvh, 900px); padding: 18px; gap: 10px; }
+.sheet-end { height: 1px; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sheet-head h2 { margin: 0; }
 .sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 4px 2px 12px; }
