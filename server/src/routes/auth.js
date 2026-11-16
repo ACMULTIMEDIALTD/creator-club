@@ -12,6 +12,7 @@ import { normalizePhone } from '../lib/phone.js';
 import { logEvent } from '../lib/events.js';
 import { mails } from '../lib/mailer.js';
 import { suggestEmail } from '../lib/emailTypos.js';
+import { issueMagicLink, sha256 } from '../lib/magicLinks.js';
 
 const router = Router();
 const MAGIC_TTL_MIN = 30;
@@ -38,7 +39,6 @@ const emailLimiter = rateLimit({
 // Compared against when the email is unknown, so the answer takes the same time either way
 const DUMMY_HASH = bcrypt.hashSync('no-such-user-dummy-password', 12);
 
-const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 // The code is only 6 digits, so it's hashed with the server secret and bound to the user
 const codeHash = (userId, code) => crypto.createHmac('sha256', config.jwtSecret).update(`login-code:${userId}:${code}`).digest('hex');
 const MAX_CODE_ATTEMPTS = 5;
@@ -100,14 +100,8 @@ router.post('/login', limiter, emailLimiter, async (req, res) => {
     }
     // Magic link. Same response whether or not the email exists (no account enumeration).
     if (user && !['suspended', 'left'].includes(user.status)) {
-      const token = crypto.randomBytes(32).toString('base64url');
       const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-      // A new request replaces older unused links/codes, so only the latest email works
-      await query('UPDATE magic_links SET used_at = now() WHERE user_id = $1 AND used_at IS NULL', [user.id]);
-      await query(
-        `INSERT INTO magic_links (token, user_id, expires_at, code_hash) VALUES ($1, $2, now() + make_interval(mins => $3), $4)`,
-        [sha256(token), user.id, MAGIC_TTL_MIN, codeHash(user.id, code)],
-      );
+      const token = await issueMagicLink(user.id, { ttlMin: MAGIC_TTL_MIN, codeHash: codeHash(user.id, code) });
       const qs = safeNext(next) ? `?next=${encodeURIComponent(next)}` : '';
       // /m/<token> is a client page: in a browser it signs in there; on a phone with the app
       // installed the same https link opens the app (universal / app links). The code is for the

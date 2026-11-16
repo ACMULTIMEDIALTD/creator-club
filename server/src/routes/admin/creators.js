@@ -7,7 +7,9 @@ import { HttpError, notFound, parse } from '../../lib/http.js';
 import { getCreatorProfile } from '../../lib/creators.js';
 import { toCsv, sendCsv } from '../../lib/csv.js';
 import { logEvent } from '../../lib/events.js';
+import { config } from '../../config.js';
 import { mails } from '../../lib/mailer.js';
+import { issueMagicLink } from '../../lib/magicLinks.js';
 import { sendPush } from '../../lib/push.js';
 import { formatAddress } from '../../lib/address.js';
 
@@ -252,23 +254,37 @@ router.patch('/:id', async (req, res) => {
   res.json({ creator: { id: req.params.id, ...fresh } });
 });
 
+const RESET_LINK_TTL_MIN = 24 * 60;
+
 /**
- * Noa sets a temporary password for a creator who forgot hers (until email sign-in links exist).
- * Shown once in the response; Noa sends it on WhatsApp and the creator can keep using it.
+ * Noa resets a creator's password. The old one stops working and every session is signed out.
+ * With email set up, the creator gets a link that signs her in and opens the new-password screen,
+ * so she picks the password herself. Without email, Noa gets a temporary password to send on WhatsApp.
  */
 router.post('/:id/reset-password', async (req, res) => {
   if (!uuid.safeParse(req.params.id).success) throw notFound('creator_not_found');
-  // No look-alike characters (0/O, 1/l/I) so it can be typed from a WhatsApp message
-  const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const password = Array.from(crypto.randomBytes(10), (b) => alphabet[b % alphabet.length]).join('');
-  const hash = await bcrypt.hash(password, 12);
+  let password = null;
+  let hash = null;
+  if (!config.mailEnabled) {
+    // No look-alike characters (0/O, 1/l/I) so it can be typed from a WhatsApp message
+    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+    password = Array.from(crypto.randomBytes(10), (b) => alphabet[b % alphabet.length]).join('');
+    hash = await bcrypt.hash(password, 12);
+  }
   const user = await one(
-    `UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1 AND role = 'creator' RETURNING id`,
+    `UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1 AND role = 'creator' RETURNING id, email`,
     [req.params.id, hash],
   );
   if (!user) throw notFound('creator_not_found');
-  await logEvent(req.user.id, 'password_reset_by_admin', { creator_id: user.id });
-  res.json({ password });
+
+  if (password) {
+    await logEvent(req.user.id, 'password_reset_by_admin', { creator_id: user.id });
+    return res.json({ password });
+  }
+  const token = await issueMagicLink(user.id, { ttlMin: RESET_LINK_TTL_MIN });
+  await mails.passwordReset(user.email, `${config.appUrl}/m/${token}?next=${encodeURIComponent('/password?reset=1')}`);
+  await logEvent(req.user.id, 'password_reset_by_admin', { creator_id: user.id, emailed: true });
+  res.json({ emailed: true, email: user.email });
 });
 
 export default router;
