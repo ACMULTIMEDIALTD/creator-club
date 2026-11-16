@@ -399,9 +399,9 @@ const routes = [
     requireAdmin();
     const u = userOf(id);
     if (!u || u.role !== 'creator') fail(404, 'creator_not_found');
-    const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-    u.password = Array.from({ length: 10 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
-    return { password: u.password };
+    // Like the server with email set up: the old password stops working and she gets a link
+    u.password = null;
+    return { emailed: true, email: u.email };
   }],
   ['POST', '/admin/images', (b) => {
     requireAdmin();

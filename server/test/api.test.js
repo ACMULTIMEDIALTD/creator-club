@@ -331,14 +331,47 @@ test('without email configured: password required, sign-in links off', async () 
   }
 });
 
-test('admin resets a creator password', async () => {
+test('admin password reset emails the creator a link to choose a new one', async () => {
   const c = await makeCreator({ admin });
+  outbox.length = 0;
   const r = await admin.post(`/api/v1/admin/creators/${c.id}/reset-password`).expect(200);
-  assert.match(r.body.password, /^[a-z2-9]{10}$/);
+  assert.deepEqual(r.body, { emailed: true, email: c.email });
+
+  // The old password stops working and she is signed out everywhere
   await agent().post('/api/v1/auth/login').send({ email: c.email, password: 'password123' }).expect(401);
-  await agent().post('/api/v1/auth/login').send({ email: c.email, password: r.body.password }).expect(200);
-  // The reset signs her out everywhere (an old session/token stops working)
   await c.agent.get('/api/v1/auth/me').expect(401);
+
+  const mail = outbox.find((m) => m.to === c.email);
+  assert.ok(mail);
+  const [, raw, next] = mail.text.match(/\/m\/([\w-]+)\?next=(\S+)/);
+  assert.equal(decodeURIComponent(next), '/password?reset=1');
+
+  // The link signs her in, and she sets the new password herself without the old one
+  const creator = agent();
+  await creator.post('/api/v1/auth/magic').send({ token: raw }).expect(200);
+  await creator.post('/api/v1/auth/password').send({ password: 'brand-new-pass' }).expect(200);
+  await agent().post('/api/v1/auth/login').send({ email: c.email, password: 'brand-new-pass' }).expect(200);
+
+  // Single use
+  await agent().post('/api/v1/auth/magic').send({ token: raw }).expect(410);
+  // Admins only
+  const other = await makeCreator({ admin });
+  await other.agent.post(`/api/v1/admin/creators/${c.id}/reset-password`).expect(403);
+});
+
+test('without email, admin password reset returns a temporary password', async () => {
+  const c = await makeCreator({ admin });
+  const { config } = await import('../src/config.js');
+  config.mailEnabled = false;
+  try {
+    const r = await admin.post(`/api/v1/admin/creators/${c.id}/reset-password`).expect(200);
+    assert.match(r.body.password, /^[a-z2-9]{10}$/);
+    await agent().post('/api/v1/auth/login').send({ email: c.email, password: 'password123' }).expect(401);
+    await agent().post('/api/v1/auth/login').send({ email: c.email, password: r.body.password }).expect(200);
+    await c.agent.get('/api/v1/auth/me').expect(401);
+  } finally {
+    config.mailEnabled = true;
+  }
 });
 
 test('campaign images: upload, signed URL, members only', async () => {

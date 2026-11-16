@@ -40,7 +40,9 @@ export default function CreatorDrawer({ id, meta, onClose, onChanged }) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [tempPassword, setTempPassword] = useState(null);
+  const [resetEmailedTo, setResetEmailedTo] = useState(null);
   const [copied, setCopied] = useState(false);
+  const mailEnabled = meta?.mail_enabled !== false;
 
   const load = () => api.get(`/admin/creators/${id}`).then((d) => { setData(d); setNotes(d.profile?.admin_notes || ''); }).catch(setError);
   useEffect(() => { setData(null); load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -61,7 +63,9 @@ export default function CreatorDrawer({ id, meta, onClose, onChanged }) {
     setError(null);
     try {
       const r = await api.post(`/admin/creators/${id}/reset-password`);
-      setTempPassword(r.password);
+      // With email set up the creator gets a link and picks the password herself
+      if (r.emailed) setResetEmailedTo(r.email);
+      else setTempPassword(r.password);
       setCopied(false);
     } catch (e) { setError(e); } finally { setSaving(false); }
   };
@@ -112,7 +116,14 @@ export default function CreatorDrawer({ id, meta, onClose, onChanged }) {
             </div>
             {u.status === 'pending' && p && <button className="btn primary block" disabled={saving} onClick={() => patch({ status: 'active' })}>אישור חברות</button>}
 
-            {tempPassword ? (
+            {resetEmailedTo ? (
+              <div className="temp-password">
+                <p>
+                  שלחנו ל{p?.full_name?.split(' ')[0] || 'יוצרת'} מייל ל-<bdi dir="ltr">{resetEmailedTo}</bdi> עם קישור לבחירת סיסמה חדשה.
+                  הקישור תקף ל-24 שעות. הסיסמה הקודמת כבר לא עובדת.
+                </p>
+              </div>
+            ) : tempPassword ? (
               <div className="temp-password">
                 <p>סיסמה חדשה ל{p?.full_name?.split(' ')[0] || 'יוצרת'}. שלחי לה אותה בווטסאפ. הסיסמה מוצגת רק עכשיו.</p>
                 <div className="row-inline">
@@ -127,7 +138,7 @@ export default function CreatorDrawer({ id, meta, onClose, onChanged }) {
                 </div>
               </div>
             ) : (
-              <ConfirmButton className="btn ghost sm" disabled={saving} ask="ליצור לה סיסמה חדשה? הסיסמה הקודמת תפסיק לעבוד." onConfirm={resetPassword}>
+              <ConfirmButton className="btn ghost sm" disabled={saving} ask={mailEnabled ? 'לשלוח לה מייל לבחירת סיסמה חדשה? הסיסמה הנוכחית תפסיק לעבוד.' : 'ליצור לה סיסמה חדשה? הסיסמה הקודמת תפסיק לעבוד.'} onConfirm={resetPassword}>
                 איפוס סיסמה
               </ConfirmButton>
             )}
